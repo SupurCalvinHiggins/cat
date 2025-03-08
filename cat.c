@@ -19,7 +19,7 @@ void slow_cat(int fd) {
   uint8_t buf[MIN_LEN];
   // TODO: error handling.
   while ((wrt_len = read(fd, buf, MIN_LEN))) {
-    write(fd, buf, wrt_len);
+    write(STDOUT_FILENO, buf, wrt_len);
   }
 }
 
@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+  int exit_status = EXIT_SUCCESS;
   for (int i = optind; i < argc; ++i) {
     if (strcmp(argv[i], "-") == 0) {
       cat(STDIN_FILENO);
@@ -76,6 +77,7 @@ int main(int argc, char *argv[]) {
       if (fd == -1) {
         fprintf(stderr, "%s: %s: No such file or directory\n", argv[0],
                 argv[i]);
+        exit_status = EXIT_FAILURE;
         continue;
       }
       cat(fd);
@@ -83,5 +85,5 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  exit(EXIT_SUCCESS);
+  exit(exit_status);
 }
