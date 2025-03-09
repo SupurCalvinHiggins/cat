@@ -43,29 +43,28 @@ int transfer_file_slow(int in_fd, int out_fd) {
   return (int)len;
 }
 
-#if defined(__linux__)
+#ifdef __linux__
 #include <sys/sendfile.h>
-#elif defined(__APPLE__)
-#include <sys/socket.h>
+bool g_transfer_bytes_fast = true;
+#else
+bool g_transfer_bytes_fast = false;
 #endif
 
 ssize_t transfer_bytes_fast(int in_fd, int out_fd, size_t len) {
-#if defined(__linux__)
-  return sendfile(out_fd, in_fd, NULL, len);
-#elif defined(__APPLE__)
-  int status = sendfile(in_fd, out_fd, 0, &len, NULL, 0);
-  return status == 0 ? (ssize_t)len : -1;
+#ifdef __linux__
+  ssize_t ret = sendfile(out_fd, in_fd, NULL, len);
+  if (errno != 0) {
+    g_transfer_bytes_fast &= !(errno == ENOSYS);
+    errno = 0;
+  }
+  return ret;
+#else
+  return -1;
 #endif
 }
 
-#ifdef _WIN32
-bool g_no_transfer_bytes_fast = true;
-#else
-bool g_no_transfer_bytes_fast = false;
-#endif
-
 int transfer_file_fast(int in_fd, int out_fd) {
-  if (g_no_transfer_bytes_fast) {
+  if (!g_transfer_bytes_fast) {
     return transfer_file_slow(in_fd, out_fd);
   }
 
@@ -87,13 +86,7 @@ int transfer_file_fast(int in_fd, int out_fd) {
     ;
 
   if (wr_len == -1) {
-    if (errno == EINVAL || errno == ENOSYS) {
-      g_no_transfer_bytes_fast = errno == ENOSYS;
-      errno = 0;
-      return transfer_file_slow(in_fd, out_fd);
-    }
-
-    return -1;
+    return transfer_file_slow(in_fd, out_fd);
   }
 
   return 0;
