@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
       status = -1;
       continue;
     }
-    status |= transfer_file_fast(in_fd, STDOUT_FILENO);
+    status |= transfer_file_slow(in_fd, STDOUT_FILENO);
     if (close(in_fd) == -1) {
       return EXIT_FAILURE;
     }

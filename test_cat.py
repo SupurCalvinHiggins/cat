@@ -123,7 +123,7 @@ def create_file(tmp_path: Path) -> Callable[[str, bytes], Path]:
         "file_dne",
     ],
 )
-def test_cat_no_args(
+def test_cat(
     cat_path: Path,
     create_file: Callable[[str, bytes], Path],
     args: list[str],
