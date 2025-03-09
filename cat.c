@@ -7,9 +7,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/sendfile.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <io.h>
+#define read _read
+#define write _write
+#define fstat _fstat
+#else
 #include <unistd.h>
+#endif
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE (4096)
@@ -51,7 +58,11 @@ ssize_t transfer_bytes_fast(int in_fd, int out_fd, size_t len) {
 #endif
 }
 
+#ifdef _WIN32
+bool g_no_transfer_bytes_fast = true;
+#else
 bool g_no_transfer_bytes_fast = false;
+#endif
 
 int transfer_file_fast(int in_fd, int out_fd) {
   if (g_no_transfer_bytes_fast) {
