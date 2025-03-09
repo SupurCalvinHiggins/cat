@@ -29,7 +29,7 @@ def compile_cmake(session_tmp_path: Path) -> Callable[[Path, str], Path]:
             [
                 "cmake",
                 "-G",
-                "\"Unix Makefiles\"",
+                "Unix Makefiles",
                 "-B",
                 build_path.as_posix(),
                 "-S",
