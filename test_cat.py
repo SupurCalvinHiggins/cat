@@ -28,6 +28,8 @@ def compile_cmake(session_tmp_path: Path) -> Callable[[Path, str], Path]:
         subprocess.run(
             [
                 "cmake",
+                "-G",
+                "\"Unix Makefiles\"",
                 "-B",
                 build_path.as_posix(),
                 "-S",
