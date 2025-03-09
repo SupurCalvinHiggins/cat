@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+// #define _GNU_SOURCE
 
 #include <errno.h>
 #include <fcntl.h>
@@ -101,7 +101,7 @@ int transfer_file_fast(int in_fd, int out_fd) {
 
 int main(int argc, char *argv[]) {
   int opt;
-  while ((opt = getopt(argc, argv, "u")) != -1) {
+  while ((opt = getopt(argc, argv, "+u")) != -1) {
     switch (opt) {
     case 'u':
       break;
