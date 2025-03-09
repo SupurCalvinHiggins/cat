@@ -1,4 +1,3 @@
-#include <bits/types/struct_iovec.h>
 #define _GNU_SOURCE
 
 #include <errno.h>
