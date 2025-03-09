@@ -1,3 +1,4 @@
+#include <bits/types/struct_iovec.h>
 #define _GNU_SOURCE
 
 #include <errno.h>
@@ -11,44 +12,81 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifndef PAGE_SIZE
 #define PAGE_SIZE (4096)
-#define MIN_LEN (32 * PAGE_SIZE)
+#endif
+#define MAX_TRANSFER_BYTES_SLOW_LEN (32 * PAGE_SIZE)
 
-void slow_cat(int fd) {
-  ssize_t wrt_len;
-  uint8_t buf[MIN_LEN];
-  // TODO: error handling.
-  while ((wrt_len = read(fd, buf, MIN_LEN))) {
-    write(STDOUT_FILENO, buf, wrt_len);
+ssize_t transfer_bytes_slow(int in_fd, int out_fd, size_t len) {
+  if (len > MAX_TRANSFER_BYTES_SLOW_LEN) {
+    return -1;
   }
+  uint8_t buf[MAX_TRANSFER_BYTES_SLOW_LEN];
+  ssize_t rd_len = read(in_fd, buf, len);
+  if (rd_len == -1) {
+    return -1;
+  }
+  return write(out_fd, buf, (size_t)rd_len);
 }
 
-void cat(int fd) {
+int transfer_file_slow(int in_fd, int out_fd) {
+  ssize_t len;
+  while ((len = transfer_bytes_slow(in_fd, out_fd,
+                                    MAX_TRANSFER_BYTES_SLOW_LEN)) > 0)
+    ;
+  return (int)len;
+}
+
+#if defined(__linux__)
+#include <sys/sendfile.h>
+#elif defined(__APPLE__)
+#include <sys/socket.h>
+#endif
+
+ssize_t transfer_bytes_fast(int in_fd, int out_fd, size_t len) {
+#if defined(__linux__)
+  return sendfile(out_fd, in_fd, NULL, len);
+#elif defined(__APPLE__)
+  int status = sendfile(in_fd, out_fd, 0, &len, NULL, 0);
+  return status == 0 ? (ssize_t)len : -1;
+#endif
+}
+
+bool g_no_transfer_bytes_fast = false;
+
+int transfer_file_fast(int in_fd, int out_fd) {
+  if (g_no_transfer_bytes_fast) {
+    return transfer_file_slow(in_fd, out_fd);
+  }
+
   struct stat st;
-  if (fstat(fd, &st) == -1)
-    exit(EXIT_FAILURE);
+  if (fstat(in_fd, &st) == -1) {
+    return -1;
+  }
 
   if (st.st_size == 0) {
-    slow_cat(fd);
-    return;
+    return transfer_file_slow(in_fd, out_fd);
   }
 
-  ssize_t len = st.st_size < MIN_LEN ? MIN_LEN : st.st_size;
-  ssize_t wrt_len;
-  while ((wrt_len = sendfile(STDOUT_FILENO, fd, NULL, len)) > 0)
+  size_t rd_len = (size_t)st.st_size;
+  if (rd_len < MAX_TRANSFER_BYTES_SLOW_LEN) {
+    rd_len = MAX_TRANSFER_BYTES_SLOW_LEN;
+  }
+  ssize_t wr_len;
+  while ((wr_len = transfer_bytes_fast(in_fd, out_fd, rd_len)) > 0)
     ;
 
-  if (wrt_len == -1) {
-    // TODO: ENOSYS sticky.
+  if (wr_len == -1) {
     if (errno == EINVAL || errno == ENOSYS) {
+      g_no_transfer_bytes_fast = errno == ENOSYS;
       errno = 0;
-      slow_cat(fd);
-      return;
+      return transfer_file_slow(in_fd, out_fd);
     }
 
-    perror("sendfile");
-    exit(EXIT_FAILURE);
+    return -1;
   }
+
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -59,31 +97,33 @@ int main(int argc, char *argv[]) {
       break;
     case '?':
       fprintf(stderr, "Usage: %s [-u] [file...]", argv[0]);
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
   }
 
   if (optind == argc) {
-    cat(STDIN_FILENO);
-    exit(EXIT_SUCCESS);
+    return transfer_file_slow(STDIN_FILENO, STDOUT_FILENO) ? EXIT_FAILURE
+                                                           : EXIT_SUCCESS;
   }
 
-  int exit_status = EXIT_SUCCESS;
+  int status = 0;
   for (int i = optind; i < argc; ++i) {
     if (strcmp(argv[i], "-") == 0) {
-      cat(STDIN_FILENO);
-    } else {
-      int fd = open(argv[i], O_RDONLY);
-      if (fd == -1) {
-        fprintf(stderr, "%s: %s: No such file or directory\n", argv[0],
-                argv[i]);
-        exit_status = EXIT_FAILURE;
-        continue;
-      }
-      cat(fd);
-      close(fd);
+      status |= transfer_file_slow(STDIN_FILENO, STDOUT_FILENO);
+      continue;
+    }
+
+    int in_fd = open(argv[i], O_RDONLY);
+    if (in_fd == -1) {
+      fprintf(stderr, "%s: %s: No such file or directory\n", argv[0], argv[i]);
+      status = -1;
+      continue;
+    }
+    status |= transfer_file_fast(in_fd, STDOUT_FILENO);
+    if (close(in_fd) == -1) {
+      return EXIT_FAILURE;
     }
   }
 
-  exit(exit_status);
+  return status ? EXIT_FAILURE : EXIT_SUCCESS;
 }
