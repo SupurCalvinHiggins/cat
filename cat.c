@@ -1,5 +1,3 @@
-// #define _GNU_SOURCE
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -8,15 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-#ifdef _WIN32
-#include <io.h>
-#define read _read
-#define write _write
-#define fstat _fstat
-#else
 #include <unistd.h>
-#endif
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE (4096)
@@ -59,6 +49,9 @@ ssize_t transfer_bytes_fast(int in_fd, int out_fd, size_t len) {
   }
   return ret;
 #else
+  (void) in_fd;
+  (void) out_fd;
+  (void) len;
   return -1;
 #endif
 }
