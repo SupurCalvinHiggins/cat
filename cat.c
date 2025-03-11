@@ -49,9 +49,9 @@ ssize_t transfer_bytes_fast(int in_fd, int out_fd, size_t len) {
   }
   return ret;
 #else
-  (void) in_fd;
-  (void) out_fd;
-  (void) len;
+  (void)in_fd;
+  (void)out_fd;
+  (void)len;
   return -1;
 #endif
 }
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
       status = -1;
       continue;
     }
-    status |= transfer_file_slow(in_fd, STDOUT_FILENO);
+    status |= transfer_file_fast(in_fd, STDOUT_FILENO);
     if (close(in_fd) == -1) {
       return EXIT_FAILURE;
     }
